@@ -13,7 +13,7 @@ def seed_users():
     users = [
         User(
             username="john_doe92",
-            email="john.doe92.graduate@gmail.com",  # Updated structure for graduate role
+            email="john.doe92@gmail.com",  # Updated structure for graduate role
             phone=create_random_phone(),
             password_hash=generate_password_hash("password123"),
             role="graduate",  # non-premium graduate
@@ -21,7 +21,7 @@ def seed_users():
         ),
         User(
             username="jane_smith87",
-            email="jane.smith87.premium_graduate@gmail.com",  # Updated structure for premium_graduate role
+            email="jane.smith87.@gmail.com",  # Updated structure for premium_graduate role
             phone=create_random_phone(),
             password_hash=generate_password_hash("securepass456"),
             role="premium_graduate",  # premium graduate
@@ -29,7 +29,7 @@ def seed_users():
         ),
         User(
             username="peter_williams",
-            email="peter.williams.graduate@gmail.com",  # Updated structure for graduate role
+            email="peter.williams.@gmail.com",  # Updated structure for graduate role
             phone=create_random_phone(),
             password_hash=generate_password_hash("mypassword789"),
             role="graduate",  # non-premium graduate
@@ -37,7 +37,7 @@ def seed_users():
         ),
         User(
             username="mary_kenya",
-            email="mary.kenya.admin@kenya.com",  # Updated structure for admin role
+            email="mary.kenya.admin@gmail.com",  # Updated structure for admin role
             phone=create_random_phone(),
             password_hash=generate_password_hash("adminpass321"),
             role="admin",  # admin role
@@ -45,7 +45,7 @@ def seed_users():
         ),
         User(
             username="joseph_ngugi",
-            email="joseph.ngugi.premium_graduate@gmail.com",  # Updated structure for premium_graduate role
+            email="joseph.ngugi@gmail.com",  # Updated structure for premium_graduate role
             phone=create_random_phone(),
             password_hash=generate_password_hash("joseph2023"),
             role="premium_graduate",  # premium graduate
@@ -53,7 +53,7 @@ def seed_users():
         ),
         User(
             username="anne_achola",
-            email="anne.achola.graduate@gmail.com",  # Updated structure for graduate role
+            email="anne.acholae@gmail.com",  # Updated structure for graduate role
             phone=create_random_phone(),
             password_hash=generate_password_hash("securepassword"),
             role="graduate",  # non-premium graduate
@@ -61,7 +61,7 @@ def seed_users():
         ),
         User(
             username="peter_mwangi",
-            email="peter.mwangi.premium_graduate@gmail.com",  # Updated structure for premium_graduate role
+            email="peter.mwangi@gmail.com",  # Updated structure for premium_graduate role
             phone=create_random_phone(),
             password_hash=generate_password_hash("securepass789"),
             role="premium_graduate",  # premium graduate
@@ -365,3 +365,4 @@ def seed_data():
 # Run the seed function
 if __name__ == "__main__":
     seed_data()
+
