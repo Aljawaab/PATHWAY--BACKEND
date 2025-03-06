@@ -1,38 +1,41 @@
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import MetaData
-from sqlalchemy.orm import validates
+from sqlalchemy import MetaData, event
+from sqlalchemy.orm import validates, relationship
 from sqlalchemy_serializer import SerializerMixin
+from datetime import datetime
 import re
-from werkzeug.security import generate_password_hash, check_password_hash
 
-db = SQLAlchemy()
+# Initialize the SQLAlchemy object
+db = SQLAlchemy(metadata=MetaData())
 
+
+
+# Base User class for common attributes
 class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
-    user_id = db.Column(db.Integer, primary_key=True)
-    role = db.Column(db.String(20), nullable=False, default='normal')  # Roles: normal, premium, admin
-    name = db.Column(db.String(255), nullable=False)
-    email = db.Column(db.String(255), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    phone = db.Column(db.String(20), nullable=True)
+    password_hash = db.Column(db.String(128), nullable=False)
+    role = db.Column(db.String(50), nullable=False, default="graduate")
+    date_joined = db.Column(db.DateTime, default=datetime.utcnow)
+
+    payments = db.relationship('Payment', back_populates='user', lazy=True, overlaps="user_payment")
+    applications = db.relationship('JobApplication', back_populates='user', lazy=True, overlaps="user_application")
 
     @validates('email')
     def validate_email(self, key, email):
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            raise ValueError("Invalid email format")
+            raise ValueError("Invalid email address.")
         return email
-    
-    @validates('role')
-    def validate_role(self, key, role):
-        if role not in ['normal', 'premium', 'admin']:
-            raise ValueError("Invalid role")
-        return role
-    
-    @validates('password_hash')
-    def validate_password_hash(self, key, password_hash):
-        if len(password_hash) < 6:
-            raise ValueError("Password must be at least 6 characters long")
-        return password_hash
-    
+
+    @validates('username')
+    def validate_username(self, key, username):
+        if len(username) < 3:
+            raise ValueError("Username must be at least 3 characters long.")
+        return username
+
     def to_dict(self):
         user_dict = {
             "username": self.username,
@@ -45,46 +48,48 @@ class User(db.Model, SerializerMixin):
         }
         return user_dict
 
-    # Relationships
-    payments = db.relationship('Payment', back_populates='user', cascade="all, delete")
-    job_applications = db.relationship('JobApplication', back_populates='user', cascade="all, delete")
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-# Job model
+# Job model with employer contact information
 class Job(db.Model, SerializerMixin):
     __tablename__ = 'jobs'
-    job_id = db.Column(db.Integer, primary_key=True)
-    job_name = db.Column(db.String(255), nullable=False)
-    job_description = db.Column(db.Text, nullable=False)
-    location = db.Column(db.String(255), nullable=False)
-    requirements = db.Column(db.Text, nullable=False)
-    salary = db.Column(db.Numeric(10, 2), nullable=False)
-    posted_date = db.Column(db.TIMESTAMP, nullable=False, server_default=db.func.current_timestamp())
-    expiration_date = db.Column(db.TIMESTAMP, nullable=False)
 
-    @validates('salary')
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    location = db.Column(db.String(100), nullable=False)
+    salary_min = db.Column(db.Float, nullable=True)
+    salary_max = db.Column(db.Float, nullable=True)
+    job_type = db.Column(db.String(50), nullable=False)
+    skills_required = db.Column(db.String(255), nullable=True)
+    benefits = db.Column(db.Text, nullable=True)
+    application_deadline = db.Column(db.DateTime, nullable=False)
+    employer = db.Column(db.String(100), nullable=False)
+    employer_email = db.Column(db.String(120), nullable=False)
+    employer_phone = db.Column(db.String(20), nullable=True)
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+    applications = db.relationship('JobApplication', back_populates='job', lazy=True)
+    extra_resources = db.relationship('ExtraResource', back_populates='job', lazy=True)
+
+    @validates('salary_min', 'salary_max')
     def validate_salary(self, key, salary):
-        if salary <= 0:
-            raise ValueError("Salary must be greater than 0")
+        if salary is not None and salary < 0:
+            raise ValueError("Salary must be a positive number.")
         return salary
-    @validates('expiration_date')
-    def validate_expiration_date(self, key, expiration_date):
-        if expiration_date <= self.posted_date:
-            raise ValueError("Expiration date must be after posted date")
-        return expiration_date
-    @validates('posted_date')
-    def validate_posted_date(self, key, posted_date):
-        if posted_date > db.func.current_timestamp():
-            raise ValueError("Posted date must be in the past")
-        return posted_date
-    # Relationships
-    job_applications = db.relationship('JobApplication', back_populates='job', cascade="all, delete")
-    
+
+    @validates('application_deadline')
+    def validate_application_deadline(self, key, application_deadline):
+        if application_deadline < datetime.utcnow():
+            raise ValueError("Application deadline must be in the future.")
+        return application_deadline
+
+    @validates('job_type')
+    def validate_job_type(self, key, job_type):
+        valid_job_types = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary']
+        if job_type not in valid_job_types:
+            raise ValueError(f"Invalid job type. Allowed types: {', '.join(valid_job_types)}.")
+        return job_type
+
     def to_dict(self):
         job_dict = {
             "title": self.title,
@@ -109,14 +114,22 @@ class Job(db.Model, SerializerMixin):
 # JobApplication model
 class JobApplication(db.Model, SerializerMixin):
     __tablename__ = 'job_applications'
-    application_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
-    job_id = db.Column(db.Integer, db.ForeignKey('jobs.job_id'), nullable=False)
-    #curriculum_vitae = db.Column(db.String(255), nullable=False)  # Store file path
 
-    user = db.relationship('User', back_populates='job_applications')
-    job = db.relationship('Job', back_populates='job_applications')
-    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    job_id = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
+    application_date = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(50), default="pending")
+
+    user = db.relationship('User', back_populates='applications', lazy=True)
+    job = db.relationship('Job', back_populates='applications', lazy=True)
+
+    @validates('status')
+    def validate_status(self, key, status):
+        if status not in ["pending", "accepted", "rejected"]:
+            raise ValueError("Invalid application status.")
+        return status
+
     def to_dict(self):
         app_dict = {
             "application_date": self.application_date,
@@ -146,28 +159,26 @@ class JobApplication(db.Model, SerializerMixin):
             }
         }
         return app_dict
-# Payment model
+
+# Payment model with fixed 5000 amount
 class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
-    payment_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
-    amount = db.Column(db.Numeric(10, 2), nullable=False)
-    payment_date = db.Column(db.TIMESTAMP, nullable=False, server_default=db.func.current_timestamp())
-    payment_method = db.Column(db.String(50), nullable=False)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False, default=5000)
+    payment_date = db.Column(db.DateTime, default=datetime.utcnow)
+    payment_status = db.Column(db.String(50), default="completed")
+
+    user = db.relationship('User', back_populates='payments', lazy=True)
+
     @validates('amount')
     def validate_amount(self, key, amount):
-        if amount <= 0:
-            raise ValueError("Amount must be greater than 0")
+        # Ensure the amount is always 5000
+        if amount != 5000:
+            raise ValueError("Payment amount must always be 5000.")
         return amount
-    @validates('payment_method')
-    def validate_payment_method(self, key, payment_method):
-        if payment_method not in ['credit_card', 'paypal']:
-            raise ValueError("Invalid payment method")
-        return payment_method
-    
-    # Relationships
-    user = db.relationship('User', back_populates='payments')
-    
+
     def to_dict(self):
         payment_dict = {
             "amount": self.amount,
@@ -182,20 +193,19 @@ class Payment(db.Model, SerializerMixin):
             }
         }
         return payment_dict
-    
+
 # ExtraResource model
 class ExtraResource(db.Model, SerializerMixin):
     __tablename__ = 'extra_resources'
-    resource_id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    #content_url = db.Column(db.String(255), nullable=False)
-    @validates('title')
-    def validate_title(self, key, title):
-        if len(title) < 5:
-            raise ValueError("Title must be at least 5 characters long")
-        return title
-    
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
+    resource_name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text)
+    resource_type = db.Column(db.String(50), nullable=False)
+
+    job = db.relationship('Job', back_populates='extra_resources')
+
     def to_dict(self):
         resource_dict = {
             "resource_name": self.resource_name,
@@ -219,4 +229,3 @@ class ExtraResource(db.Model, SerializerMixin):
             }
         }
         return resource_dict
-    
