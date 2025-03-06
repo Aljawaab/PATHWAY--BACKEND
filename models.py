@@ -5,8 +5,12 @@ from sqlalchemy_serializer import SerializerMixin
 from datetime import datetime
 import re
 
-
+# Initialize the SQLAlchemy object
 db = SQLAlchemy(metadata=MetaData())
+
+
+
+# Base User class for common attributes
 class User(db.Model, SerializerMixin):
     __tablename__ = 'users'
 
@@ -18,11 +22,9 @@ class User(db.Model, SerializerMixin):
     role = db.Column(db.String(50), nullable=False, default="graduate")
     date_joined = db.Column(db.DateTime, default=datetime.utcnow)
 
-
-
     payments = db.relationship('Payment', back_populates='user', lazy=True, overlaps="user_payment")
     applications = db.relationship('JobApplication', back_populates='user', lazy=True, overlaps="user_application")
-    
+
     @validates('email')
     def validate_email(self, key, email):
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
@@ -35,7 +37,19 @@ class User(db.Model, SerializerMixin):
             raise ValueError("Username must be at least 3 characters long.")
         return username
 
+    def to_dict(self):
+        user_dict = {
+            "username": self.username,
+            "email": self.email,
+            "phone": self.phone,
+            "role": self.role,
+            "date_joined": self.date_joined,
+            "payments": [payment.to_dict() for payment in self.payments],
+            "applications": [app.to_dict() for app in self.applications]
+        }
+        return user_dict
 
+# Job model with employer contact information
 class Job(db.Model, SerializerMixin):
     __tablename__ = 'jobs'
 
@@ -77,8 +91,28 @@ class Job(db.Model, SerializerMixin):
             raise ValueError(f"Invalid job type. Allowed types: {', '.join(valid_job_types)}.")
         return job_type
 
+    def to_dict(self):
+        job_dict = {
+            "title": self.title,
+            "description": self.description,
+            "location": self.location,
+            "salary_min": self.salary_min,
+            "salary_max": self.salary_max,
+            "job_type": self.job_type,
+            "skills_required": self.skills_required,
+            "benefits": self.benefits,
+            "application_deadline": self.application_deadline,
+            "employer": self.employer,
+            "employer_email": self.employer_email,
+            "employer_phone": self.employer_phone,
+            "date_posted": self.date_posted,
+            "is_active": self.is_active,
+            "applications": [application.to_dict() for application in self.applications],
+            "extra_resources": [resource.to_dict() for resource in self.extra_resources]
+        }
+        return job_dict
 
-
+# JobApplication model
 class JobApplication(db.Model, SerializerMixin):
     __tablename__ = 'job_applications'
 
@@ -97,7 +131,37 @@ class JobApplication(db.Model, SerializerMixin):
             raise ValueError("Invalid application status.")
         return status
 
+    def to_dict(self):
+        app_dict = {
+            "application_date": self.application_date,
+            "status": self.status,
+            "user": {
+                "username": self.user.username,
+                "email": self.user.email,
+                "phone": self.user.phone,
+                "role": self.user.role,
+                "date_joined": self.user.date_joined
+            },
+            "job": {
+                "title": self.job.title,
+                "description": self.job.description,
+                "location": self.job.location,
+                "salary_min": self.job.salary_min,
+                "salary_max": self.job.salary_max,
+                "job_type": self.job.job_type,
+                "skills_required": self.job.skills_required,
+                "benefits": self.job.benefits,
+                "application_deadline": self.job.application_deadline,
+                "employer": self.job.employer,
+                "employer_email": self.job.employer_email,
+                "employer_phone": self.job.employer_phone,
+                "date_posted": self.job.date_posted,
+                "is_active": self.job.is_active
+            }
+        }
+        return app_dict
 
+# Payment model with fixed 5000 amount
 class Payment(db.Model, SerializerMixin):
     __tablename__ = 'payments'
 
@@ -116,8 +180,22 @@ class Payment(db.Model, SerializerMixin):
             raise ValueError("Payment amount must always be 5000.")
         return amount
 
+    def to_dict(self):
+        payment_dict = {
+            "amount": self.amount,
+            "payment_date": self.payment_date,
+            "payment_status": self.payment_status,
+            "user": {
+                "username": self.user.username,
+                "email": self.user.email,
+                "phone": self.user.phone,
+                "role": self.user.role,
+                "date_joined": self.user.date_joined
+            }
+        }
+        return payment_dict
 
-
+# ExtraResource model
 class ExtraResource(db.Model, SerializerMixin):
     __tablename__ = 'extra_resources'
 
@@ -128,6 +206,30 @@ class ExtraResource(db.Model, SerializerMixin):
     resource_type = db.Column(db.String(50), nullable=False)
 
     job = db.relationship('Job', back_populates='extra_resources')
+
+    def to_dict(self):
+        resource_dict = {
+            "resource_name": self.resource_name,
+            "description": self.description,
+            "resource_type": self.resource_type,
+            "job": {
+                "title": self.job.title,
+                "description": self.job.description,
+                "location": self.job.location,
+                "salary_min": self.job.salary_min,
+                "salary_max": self.job.salary_max,
+                "job_type": self.job.job_type,
+                "skills_required": self.job.skills_required,
+                "benefits": self.job.benefits,
+                "application_deadline": self.job.application_deadline,
+                "employer": self.job.employer,
+                "employer_email": self.job.employer_email,
+                "employer_phone": self.job.employer_phone,
+                "date_posted": self.job.date_posted,
+                "is_active": self.job.is_active
+            }
+        }
+        return resource_dict
 
 
 
