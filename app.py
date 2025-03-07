@@ -5,6 +5,7 @@ from flask_cors import CORS
 from models import db, User, Job, JobApplication, Payment, ExtraResource
 import datetime
 from flask import Response
+import bcrypt
 
 app = Flask(__name__)
 cors = CORS(app, origins="*")
@@ -118,22 +119,54 @@ class GetUser(Resource):
         user_data.pop('payments', None)
         return jsonify(user_data)  # Return the filtered user data as JSON
     
+    
 class AddUser(Resource):
     def post(self):
         data = request.get_json()
+
         try:
+            # Ensure username, email, and password are provided
+            if not data.get('username') or not data.get('email') or not data.get('password'):
+                return jsonify({"error": "Username, email, and password are required."}), 400
+
+            # Extract the email
+            email = data['email']
+
+            # Determine the user's role based on the email structure
+            if email.endswith('.admin@gmail.com') or '.admin' in email.split('@')[-1]:
+                role = 'admin'
+            else:
+                role = 'graduate'
+
+            # Hash the password before storing it
+            password_hash = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+
+            # Create the user object
             user = User(
                 username=data['username'],
-                email=data['email'],
-                phone=data.get('phone'),
-                password_hash=data['password_hash'],
-                role=data.get('role', 'graduate')
+                email=email,
+                phone=data.get('phone'),  # Optional
+                password_hash=password_hash,
+                role=role  # Set the role based on the email structure
             )
+
+            # Add the user to the database
             db.session.add(user)
             db.session.commit()
-            return jsonify(user.to_dict()), 201
+
+            # Respond with the created user (excluding password hash)
+            return jsonify({
+                'message': 'User created successfully!',
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'phone': user.phone,
+                'role': user.role
+            }), 201
+
         except Exception as e:
             return jsonify({"error": str(e)}), 400
+
 
 class UpdateUser(Resource):
     def put(self, user_id):
